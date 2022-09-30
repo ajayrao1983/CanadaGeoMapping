@@ -17,12 +17,12 @@ p_load(data.table, leaflet, rgdal, sp, htmltools,
 
 ## Importing Shapefile
 ```{r}
-shpDF <- readOGR(dsn="../lfsa000b16a_e.shp")
+shpDF <- readOGR(dsn="Data/lfsa000b16a_e.shp")
 ```
 ## Load Population Data File
 ```{r}
 ## Import .csv file using "fread"
-popDT <- fread("../T1201EN.CSV", nrows = 1642)
+popDT <- fread("Data/T1201EN.CSV", nrows = 1642)
 
 ## We drop the frist row --> this corresponds to Total Canada
 ## and the fourth column --> this column doesn't have any data
@@ -36,7 +36,7 @@ colnames(popDT) <- c("FSA", "GEOName", "Province", "Population",
 ## Import FSA names from Canada Post PDF
 ```{r}
 ## Read the PDF file
-pdfPageList <- pdf_text("../fsa-list-april-2022.pdf") %>% 
+pdfPageList <- pdf_text("Data/fsa-list-april-2022.pdf") %>% 
   str_split("\n")
 
 
