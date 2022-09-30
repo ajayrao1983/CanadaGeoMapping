@@ -1,0 +1,17 @@
+---
+title: "Load App to shinyapps.io"
+author: "Ajay Rao"
+output: html_notebook
+---
+
+
+```{r}
+library(rsconnect)
+
+rsconnect::setAccountInfo(name='Account Name', 
+                          token='Account Token',
+                          secret='Account Secret')
+
+
+rsconnect::deployApp('Path To App')
+```

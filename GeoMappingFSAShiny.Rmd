@@ -1,0 +1,136 @@
+---
+title: "Data Prep - FSA Area Mapping"
+author: "Ajay Rao"
+output: html_notebook
+---
+
+## Importing Libraries
+
+```{r}
+if (!require(pacman)) install.packages("pacman")
+
+library(pacman)
+
+p_load(data.table, leaflet, rgdal, sp, htmltools, 
+       pdftools, tidyverse, scales)
+```
+
+## Importing Shapefile
+```{r}
+shpDF <- readOGR(dsn="../lfsa000b16a_e.shp")
+```
+## Load Population Data File
+```{r}
+## Import .csv file using "fread"
+popDT <- fread("../T1201EN.CSV", nrows = 1642)
+
+## We drop the frist row --> this corresponds to Total Canada
+## and the fourth column --> this column doesn't have any data
+popDT <- popDT[-1,-4]
+
+## Give easier to manage column names
+colnames(popDT) <- c("FSA", "GEOName", "Province", "Population",
+                     "Dwellings", "DwellingsOccupied")
+```
+
+## Import FSA names from Canada Post PDF
+```{r}
+## Read the PDF file
+pdfPageList <- pdf_text("../fsa-list-april-2022.pdf") %>% 
+  str_split("\n")
+
+
+## The first page doesn't contain any FSAs so we skip it
+## The top 11 lines are headers
+## The last two lines are footers
+for(i in 2:15) { #sets the iteration to go through all 17 pages
+  pdfPageList[[i]] <- pdfPageList[[i]][11:(length(pdfPageList[[i]]) - 2)]
+}
+rm(i)
+
+## Convert the List to Table
+myFunc <- function(x)
+{
+  ## This function converts list to data.table
+  
+  return(data.table(x))
+}
+
+pdfPageTable <- do.call("rbind",lapply(pdfPageList[2:15], myFunc))
+
+rm(pdfPageList)
+
+## Split text into individual columns
+### If there are 4 consecutive white space, we consider that as a separator
+pdfPageTable[,paste0("c", seq(1, 4)):=tstrsplit(x, "\\s{4, }")]
+### Drop the original column
+pdfPageTable <- pdfPageTable[,!"x",with=F]
+
+## Extract FSA codes and FSA Names
+myFunc2 <- function(x, DT)
+{
+ 
+  # For each column passed to this function
+  # First 3 characters are considered as FSA code
+  # The text starting from 4 character onwards is considered FSA Name
+  
+  # The FSA codes and Names are stored as a data.table and returned
+  
+  DT2 <- DT[,x,with=F]
+  
+  DT2 <- DT2[!is.na(get(x)) & !(get(x) == "SUCC BUREAU-CHEF") & !get(x)=="",]
+  
+  DT2$FSA <- substr(trimws(DT2[[x]]), 1, 3)
+  DT2$FSAName <- trimws(substr(trimws(DT2[[x]]), 4, nchar(DT2[[x]])))
+  DT2 <- DT2[,!x,with=F]
+  
+  return(DT2)
+}
+
+modTable <- do.call("rbind", 
+                    lapply(colnames(pdfPageTable), 
+                           myFunc2, DT = pdfPageTable))
+
+rm(pdfPageTable)
+```
+
+
+## Merge Population Data with Shape File and Canada Post PDF
+```{r}
+## Merge the Shape File with Population Data
+shpPopDT <- merge(x = shpDF,
+                  y = popDT,
+                  by.x = "CFSAUID",
+                  by.y = "FSA",
+                  all.x = T)
+
+## Delete the shpDF to reduce memory space
+rm(shpDF, popDT)
+gc()
+
+
+## Merge the FSA Names
+shpPopDT <- merge(
+  x = shpPopDT,
+  y = modTable,
+  by.x = "CFSAUID",
+                  by.y = "FSA",
+                  all.x = T
+)
+rm(modTable)
+
+## Convert the Merged File into a Shape File format
+shpPopDT <- spTransform(shpPopDT, CRS("+init=epsg:4326"))
+
+
+```
+
+## Export Environment
+```{r}
+
+rm(myFunc, myFunc2)
+
+save.image("App/data/shpFile.RData")
+
+```
+
